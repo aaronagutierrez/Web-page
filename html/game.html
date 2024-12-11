@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blackjack</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #2d3b2f;
+      color: white;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    .game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    .button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      font-size: 18px;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+    .button:hover {
+      background-color: #45a049;
+    }
+    .scoreboard {
+      margin-top: 20px;
+    }
+    .cards {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .card {
+      width: 50px;
+      height: 75px;
+      background-color: #fff;
+      color: black;
+      text-align: center;
+      line-height: 75px;
+      margin: 0 5px;
+      font-size: 24px;
+      border-radius: 5px;
+    }
+    .hidden {
+      background-color: gray;
+    }
+    h1 {
+      font-size: 36px;
+      margin-top: 30px;
+    }
+    .balance {
+      font-size: 20px;
+      margin-top: 20px;
+    }
+    .game-over {
+      color: red;
+      font-size: 24px;
+      font-weight: bold;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="game-container">
+  <h1>Blackjack</h1>
+
+  <div class="balance">
+    <p id="playerBalance">Player Balance: $100</p>
+  </div>
+
+  <div class="scoreboard">
+    <p id="playerScore">Player Score: 0</p>
+    <p id="dealerScore">Dealer Score: 0</p>
+  </div>
+
+  <div class="cards" id="playerCards">
+    <!-- Player's cards will be displayed here -->
+  </div>
+
+  <div class="cards" id="dealerCards">
+    <!-- Dealer's cards will be displayed here -->
+  </div>
+
+  <div>
+    <input type="number" id="betAmount" placeholder="Enter bet ($5 min)" min="5" step="5">
+    <button class="button" id="betButton">Place Bet</button>
+    <button class="button" id="hitButton" disabled>Hit</button>
+    <button class="button" id="standButton" disabled>Stand</button>
+    <button class="button" id="resetButton" style="background-color: #f44336;">Reset</button>
+  </div>
+
+  <div id="gameOverMessage" class="game-over"></div>
+</div>
+
+<script>
+  const suits = ['♠', '♥', '♦', '♣'];
+  const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+
+  let playerHand = [];
+  let dealerHand = [];
+  let deck = [];
+  let playerScore = 0;
+  let dealerScore = 0;
+  let playerBalance = 100;
+  let currentBet = 0;
+  let gameOver = false;
+
+  const playerBalanceEl = document.getElementById('playerBalance');
+  const playerScoreEl = document.getElementById('playerScore');
+  const dealerScoreEl = document.getElementById('dealerScore');
+  const playerCardsEl = document.getElementById('playerCards');
+  const dealerCardsEl = document.getElementById('dealerCards');
+  const hitButton = document.getElementById('hitButton');
+  const standButton = document.getElementById('standButton');
+  const resetButton = document.getElementById('resetButton');
+  const betButton = document.getElementById('betButton');
+  const betAmountEl = document.getElementById('betAmount');
+  const gameOverMessageEl = document.getElementById('gameOverMessage');
+
+  function initializeDeck() {
+    deck = [];
+    for (let suit of suits) {
+      for (let value of values) {
+        deck.push({ suit, value });
+      }
+    }
+    shuffleDeck();
+  }
+
+  function shuffleDeck() {
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+  }
+
+  function dealCard(hand) {
+    const card = deck.pop();
+    hand.push(card);
+    return card;
+  }
+
+  function calculateScore(hand) {
+    let score = 0;
+    let aceCount = 0;
+
+    for (let card of hand) {
+      if (['J', 'Q', 'K'].includes(card.value)) {
+        score += 10;
+      } else if (card.value === 'A') {
+        aceCount++;
+        score += 11;
+      } else {
+        score += parseInt(card.value);
+      }
+    }
+
+    while (score > 21 && aceCount > 0) {
+      score -= 10;
+      aceCount--;
+    }
+    return score;
+  }
+
+  function displayCards() {
+    playerCardsEl.innerHTML = '';
+    dealerCardsEl.innerHTML = '';
+
+    for (let card of playerHand) {
+      const cardDiv = document.createElement('div');
+      cardDiv.classList.add('card');
+      cardDiv.innerText = card.value + card.suit;
+      playerCardsEl.appendChild(cardDiv);
+    }
+
+    for (let i = 0; i < dealerHand.length; i++) {
+      const cardDiv = document.createElement('div');
+      cardDiv.classList.add('card');
+      if (i === 0 && !gameOver) {
+        cardDiv.classList.add('hidden');
+        cardDiv.innerText = '??';
+      } else {
+        cardDiv.innerText = dealerHand[i].value + dealerHand[i].suit;
+      }
+      dealerCardsEl.appendChild(cardDiv);
+    }
+
+    playerScore = calculateScore(playerHand);
+    dealerScore = calculateScore(dealerHand);
+
+    playerScoreEl.innerText = `Player Score: ${playerScore}`;
+    dealerScoreEl.innerText = `Dealer Score: ${dealerScore}`;
+  }
+
+  function handleHit() {
+    if (gameOver) return;
+    dealCard(playerHand);
+    displayCards();
+    if (playerScore > 21) {
+      gameOver = true;
+      playerBalanceEl.innerText = `Player Balance: $${playerBalance}`;
+      dealerScoreEl.innerText = `Dealer Wins! Player Score: ${playerScore}`;
+      hitButton.disabled = true;
+      standButton.disabled = true;
+      checkGameOver();
+    }
+  }
+
+  function dealerTurn() {
+    // The dealer cannot hit if their score is 17 or higher in the first hand
+    while (dealerScore < 17) {
+      dealCard(dealerHand);
+      displayCards();
+    }
+
+    if (dealerScore > 21) {
+      gameOver = true;
+      playerBalance += currentBet * 2;
+      playerBalanceEl.innerText = `Player Balance: $${playerBalance}`;
+      dealerScoreEl.innerText = `Player Wins!`;
+    } else if (dealerScore > playerScore) {
+      gameOver = true;
+      dealerScoreEl.innerText = `Dealer Wins!`;
+    } else if (dealerScore === playerScore) {
+      gameOver = true;
+      playerBalance += currentBet;  // Return the bet to the player in case of a tie
+      dealerScoreEl.innerText = `It's a Tie!`;
+    } else {
+      gameOver = true;
+      playerBalance += currentBet * 2;  // Player wins, double the bet
+      playerBalanceEl.innerText = `Player Balance: $${playerBalance}`;
+      dealerScoreEl.innerText = `Player Wins!`;
+    }
+
+    hitButton.disabled = true;
+    standButton.disabled = true;
+    checkGameOver();
+  }
+
+  function handleStand() {
+    if (gameOver) return;
+    dealerTurn();
+  }
+
+  function checkGameOver() {
+    if (playerBalance <= 0) {
+      gameOverMessageEl.innerText = 'Game Over! You ran out of money! Starting a new game...';
+      setTimeout(() => {
+        playerBalance = 100;
+        playerBalanceEl.innerText = `Player Balance: $${playerBalance}`;
+        resetGame();
+      }, 3000);
+    } else {
+      gameOverMessageEl.innerText = '';
+    }
+  }
+
+  function resetGame() {
+    playerHand = [];
+    dealerHand = [];
+    gameOver = false;
+    initializeDeck();
+    displayCards();
+    hitButton.disabled = true;
+    standButton.disabled = true;
+    betAmountEl.disabled = false;
+    betButton.disabled = false;
+    gameOverMessageEl.innerText = '';
+  }
+
+  function placeBet() {
+    const betAmount = parseInt(betAmountEl.value);
+
+    if (isNaN(betAmount) || betAmount < 5 || betAmount > playerBalance) {
+      alert('Invalid bet amount. Minimum $5 and cannot exceed your balance.');
+      return;
+    }
+
+    currentBet = betAmount;
+    playerBalance -= betAmount;
+    playerBalanceEl.innerText = `Player Balance: $${playerBalance}`;
+    betAmountEl.disabled = true;
+    betButton.disabled = true;
+    startGame();
+  }
+
+  function startGame() {
+    initializeDeck();
+    dealInitialCards();
+  }
+
+  function dealInitialCards() {
+    for (let i = 0; i < 2; i++) {
+      dealCard(playerHand);
+      dealCard(dealerHand);
+    }
+    displayCards();
+    hitButton.disabled = false;
+    standButton.disabled = false;
+  }
+
+  betButton.addEventListener('click', placeBet);
+  hitButton.addEventListener('click', handleHit);
+  standButton.addEventListener('click', handleStand);
+  resetButton.addEventListener('click', resetGame);
+</script>
+
+</body>
+</html>
